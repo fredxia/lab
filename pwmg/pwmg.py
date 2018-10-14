@@ -25,13 +25,17 @@
 # optional arguments:
 #   -h, --help      show this help message and exit
 #   -k secrete      Secrete key
-#   -f filename     Credential file
+#   -f filename     Credential file. 
 #   -n new_secrete  New secrete key
 #   -d              Delete site
 #   -i filename     Import from a plain text file. Merge with existing.
 #   -x filename     Export to a plain text file
 #
 # Note:
+#
+#     If -f is not specified the default is $PWMG_FILENAME if defined or
+#     $HOME/.pwmg_db
+#
 #     Import/Export file format is lines of <site>, <account>, <password>
 #     Each line is one site.
 #
@@ -133,10 +137,13 @@ class Credentials:
         data = aes.decrypt(cipherText)
         if not data:
             raise Exception("Decrypt failed")
-        creds = pickle.loads(data[:dataLen])
-        creds.filename = filename
-        assert isinstance(creds, Credentials)
-        return creds
+        try:
+            creds = pickle.loads(data[:dataLen])
+            creds.filename = filename
+            assert isinstance(creds, Credentials)
+            return creds
+        except Exception as ex:
+            print("Decryption failed. Either incorrect password or file")
 
     @staticmethod
     def importCredentials(inputFile, outputFile, secrete):

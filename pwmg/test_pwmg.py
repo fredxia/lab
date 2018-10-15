@@ -66,7 +66,7 @@ def runTests():
     # test matching substring
     output = runCommand("%s -k 1234 site" % prog)
     verifyOutput(output, ("Site Account Password",
-                          "site1 acc1 pass1",                          
+                          "site1 acc1 pass1",
                           "site2 acc2 pass2"))
     print("test2 passed")
 
@@ -133,7 +133,7 @@ def runTests():
     verifyOutput(output, "my site my account my password")
     # test matching substring
     output = runCommand("%s -k 1234 'my si'" % prog)
-    verifyOutput(output, "my site my account my password")    
+    verifyOutput(output, "my site my account my password")
     print("test7 passed")
 
     # test new secrete

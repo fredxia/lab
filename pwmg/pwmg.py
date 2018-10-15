@@ -1,7 +1,7 @@
 #!/usr/bin/python3
-# pylint: disable-msg=C0103,C0111,C0410
+# pylint: disable-msg=C0103,C0111,C0410,W0703
 #
-# Packages required: pycrypto, tabulate
+# Python3 packages required: pycrypto, tabulate
 #
 # Description:
 #   A simple program using a master key to encrypt a collection of password
@@ -25,7 +25,7 @@
 # optional arguments:
 #   -h, --help      show this help message and exit
 #   -k secrete      Secrete key
-#   -f filename     Credential file. 
+#   -f filename     Credential file.
 #   -n new_secrete  New secrete key
 #   -d              Delete site
 #   -i filename     Import from a plain text file. Merge with existing.
@@ -41,7 +41,7 @@
 #
 #     For option -i the merge will not overwrite credentials already exists
 #     in the master records.
-# 
+#
 import os, sys, argparse, pickle, hashlib
 from struct import pack, unpack, calcsize
 from Crypto.Cipher import AES
@@ -64,6 +64,7 @@ class Credentials:
 
     def __init__(self):
         self.records = {}
+        self.filename = None
 
     def setCredential(self, site, account, password):
         self.records[site] = (account, password)
@@ -72,10 +73,17 @@ class Credentials:
         if site in self.records:
             del self.records[site]
 
-    def getCredential(self, site):
-        if site in self.records:
-            return self.records[site]
-        return None
+    def getCredentials(self, site):
+        '''
+        Return a list of tuples (site, account, password) for all records
+        whose site contains 'site' substring.
+        '''
+        # Find matching sub string
+        records = []
+        for s in self.records:
+            if site in s:
+                records.append((s, self.records[s][0], self.records[s][1]))
+        return records
 
     def saveCredentials(self, filename, secrete):
         data = pickle.dumps(self)
@@ -142,7 +150,7 @@ class Credentials:
             creds.filename = filename
             assert isinstance(creds, Credentials)
             return creds
-        except Exception as ex:
+        except Exception:
             print("Decryption failed. Either incorrect password or file")
 
     @staticmethod
@@ -256,10 +264,9 @@ def runCommand(args):
         creds.deleteCredential(args.site)
         creds.saveCredentials(args.f, args.k)
     else:
-        cred = creds.getCredential(args.site)
-        if cred is not None:
-            print(tabulate([(args.site, cred[0], cred[1])],
-                           headers=["Site", "Account", "Password"]))
+        creds = creds.getCredentials(args.site)
+        if creds:
+            print(tabulate(creds, headers=["Site", "Account", "Password"]))
         else:
             print("Site note found")
 

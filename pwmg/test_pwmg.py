@@ -63,6 +63,11 @@ def runTests():
     verifyOutput(output, ("Site Account Password",
                           "site2 acc2 pass2"))
     verifyOutput(output, "site1 acc1 pass1", negative=True)
+    # test matching substring
+    output = runCommand("%s -k 1234 site" % prog)
+    verifyOutput(output, ("Site Account Password",
+                          "site1 acc1 pass1",                          
+                          "site2 acc2 pass2"))
     print("test2 passed")
 
     # Cleanup db file
@@ -126,6 +131,9 @@ def runTests():
     runCommand("%s -k 1234 'my site' 'my account' 'my password'" % prog)
     output = runCommand("%s -k 1234" % prog)
     verifyOutput(output, "my site my account my password")
+    # test matching substring
+    output = runCommand("%s -k 1234 'my si'" % prog)
+    verifyOutput(output, "my site my account my password")    
     print("test7 passed")
 
     # test new secrete
@@ -143,6 +151,13 @@ def runTests():
     output = runCommand("%s -k 4321 -f %s" % (prog, tmpFile2))
     verifyOutput(output, ("my site my account my password",
                           "site5 acc5 pass5"))
+    # test option -f with 'site' substring match
+    output = runCommand("%s -k 4321 -f %s site" % (prog, tmpFile2))
+    verifyOutput(output, ("my site my account my password",
+                          "site5 acc5 pass5"))
+    # And exact match
+    output = runCommand("%s -k 4321 -f %s site5" % (prog, tmpFile2))
+    verifyOutput(output, ("site5 acc5 pass5"))
     print("test9 passed")
 
     # test -d with -f

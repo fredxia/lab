@@ -60,7 +60,7 @@ in the master records.
 * SECURITY WARNING
 
 If the command is invoked in a shell such as bash by default the master 
-secrete key, if provided with option "-k", will be saved in shell history, 
+secrete key, if provided with option "-k", WILL BE SAVED IN SHELL HISTORY, 
 such as ~/.bash_history. This can be a security risk.
 
 To avoid this problem one should either use shell command to disable

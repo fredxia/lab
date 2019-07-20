@@ -5,63 +5,42 @@
 #
 # Python3 packages required: pycrypto, tabulate
 #
-# Description:
-#   A simple program using a master key to encrypt a collection of password
-#   records. Each password record consists of a site, an account, and a
-#   password.
+# A very simple password management program. Please see README.org for more
+# information.
 #
-#   The record collection is keyed by site. Use pickle library to serialize
-#   and deserialize the collection.
-#
-#   It computes a 32-byte hash digest from master secrete password. The
-#   digest is then used as the encryption key with AES256 encryption to
-#   encrypt the serialized(pickled) binary value and decrypt the binary
-#   before deserializing(un-pickle) to a record collection.
-#
-# Contact: fxia@yahoo.com
-#
-# usage: pwmg.py [-h] -k secrete [-f filename] [-n new_secrete] [-d]
-#                [-i filename] [-x filename]
-#                [site] [account] [password]
-#
-# optional arguments:
-#   -h, --help      show this help message and exit
-#   -k secrete      Secrete key
-#   -f filename     Credential file.
-#   -n new_secrete  New secrete key
-#   -d              Delete site
-#   -i filename     Import from a plain text file. Merge with existing.
-#   -x filename     Export to a plain text file
-#
-# Note:
-#
-#     If -f is not specified the default is $PWMG_FILENAME if defined or
-#     $HOME/.pwmg_db
-#
-#     Import/Export file format is lines of <site>, <account>, <password>
-#     Each line is one site.
-#
-#     For option -i the merge will not overwrite credentials already exists
-#     in the master records.
-#
-#
-import os, sys, argparse, pickle, hashlib
+import os, sys, argparse, pickle, hashlib, time
+from datetime import datetime
 from struct import pack, unpack, calcsize
 from Crypto.Cipher import AES
 from tabulate import tabulate
+
+version = 1
 
 def normalizeSecrete(secrete):
     '''
     Create 32-byte hash from the master secrete. This hash is used as key
     for AES256 encryption.
     '''
-    if secrete is None:
-        raise Exception("Must provide secrete key")
+    assert secrete, "Must provide secrete key"
     m = hashlib.shake_256()
     m.update(secrete.encode())
     # pylint: disable-msg=E1121
     return m.digest(32)
     # pylint: enable-msg=E1121
+
+def readSecreteInput(prompt):
+    s = input(prompt + "\n")
+    return s
+
+def printTabulate(records, fh=None):
+    rows = []
+    for site in sorted(records.keys()):
+        rec = records[site]
+        tm = "" if len(rec) == 2 else \
+            datetime.fromtimestamp(rec[2]).strftime("%y/%m/%d")
+        rows.append((site, rec[0], rec[1], tm))
+    print(tabulate(rows, headers=["Site", "Account", "Password", "Timestamp"]),
+          file=fh if fh else sys.stdout)
 
 class Credentials:
 
@@ -69,26 +48,27 @@ class Credentials:
         self.records = {}
         self.filename = None
 
-    def setCredential(self, site, account, password):
-        self.records[site] = (account, password)
+    def setCredential(self, site, account, password, timestamp=None):
+        if timestamp is None:
+            timestamp = int(time.time())
+        self.records[site] = (account, password, timestamp)
 
     def deleteCredential(self, site):
         if site in self.records:
             del self.records[site]
 
-    def getCredentials(self, site):
-        '''
-        Return a list of tuples (site, account, password) for all records
-        whose site contains 'site' substring.
-        '''
-        # Find matching sub string
-        records = []
-        for s in self.records:
-            if site in s:
-                records.append((s, self.records[s][0], self.records[s][1]))
-        return records
+    def getCredentials(self, siteStr):
+        creds = {}
+        for s, rec in self.records.items():
+            if siteStr in s: # match substring
+                creds[s] = rec
+        return creds
 
     def saveCredentials(self, filename, secrete):
+        '''Encrypt using secrete and save credential records to a file. File
+           format is a length of pickled but pre-encrypt data, followed by
+           the cyper text.
+        '''
         data = pickle.dumps(self)
         dataLen = len(data)
         padding = dataLen % 16
@@ -99,14 +79,14 @@ class Credentials:
         fh = open(filename, "wb")
         if not fh:
             raise Exception("Cannot open file %s" % filename)
+        fh.write(pack("i", version))
         fh.write(pack("i", dataLen))
         fh.write(ciperText)
         fh.close()
 
     def exportCredentials(self, filenameOrHandle, prettyPrint):
-        '''
-        Export credentials to either a file handle, or to a file.
-        prettyPrint or comma-separated format (good for import).
+        '''Export credentials to either a file handle, or to a file.
+           prettyPrint or comma-separated format (good for import).
         '''
         if isinstance(filenameOrHandle, str):
             fh = open(filenameOrHandle, "w")
@@ -116,18 +96,16 @@ class Credentials:
             fh = filenameOrHandle
         if not prettyPrint:
             for site in sorted(self.records.keys()):
-                fh.write("%s, %s, %s\n" % (site,
-                                           self.records[site][0],
-                                           self.records[site][1]))
+                rec = self.records[site]
+                if len(rec) == 2:
+                    # Use today's date for timestamp
+                    tm = time.strftime("%y/%m/%d")
+                else:
+                    tm = datetime.fromtimestamp(rec[2]).strftime("%y/%m/%d")
+                fh.write("%s, %s, %s, %s\n" % (site, rec[0], rec[1], tm))
         else:
-            rows = []
-            for site in sorted(self.records.keys()):
-                rows.append((site,
-                             self.records[site][0],
-                             self.records[site][1]))
             print("\nMaster file: %s\n" % self.filename)
-            print(tabulate(rows, headers=["Site", "Account", "Password"]),
-                  file=filenameOrHandle)
+            printTabulate(self.records, filenameOrHandle)
         if isinstance(filenameOrHandle, str):
             fh.close()
 
@@ -140,9 +118,10 @@ class Credentials:
         if not fh:
             raise Exception("Cannot read file %s" % filename)
         intSz = calcsize("i")
+        ver, = unpack("i", fh.read(intSz))
+        assert version == ver
         dataLen, = unpack("i", fh.read(intSz))
         cipherText = fh.read()
-        #print("cipher len: %d, %d" % (len(cipherText), dataLen))
         fh.close()
         aes = AES.new(normalizeSecrete(secrete), AES.MODE_ECB)
         data = aes.decrypt(cipherText)
@@ -158,13 +137,11 @@ class Credentials:
 
     @staticmethod
     def importCredentials(inputFile, outputFile, secrete):
+        '''Import credential from a plain text file. File must be in a format
+           in which each line is <site>,<account>,<password>. Line starting
+           with '#' is ignored.
         '''
-        Import credential from a plain text file. File must be in a format
-        in which each line is <site>,<account>,<password>. Line starting
-        with '#' is ignored.
-        '''
-        if not os.path.isfile(inputFile):
-            raise Exception("File %s not found" % inputFile)
+        assert os.path.isfile(inputFile), "File %s not found" % inputFile
         fh = open(inputFile, "r")
         if not fh:
             raise Exception("Cannot open file %s" % inputFile)
@@ -176,24 +153,29 @@ class Credentials:
             if line.startswith("#"):
                 continue
             items = line.strip().split(",")
-            if len(items) != 3:
+            if len(items) >= 3:
+                timestamp = None
+                if len(items) == 4:
+                    if '/' in items[3]:
+                        timestamp = int(time.mktime(time.strptime(
+                            items[3].strip(), "%y/%m/%d")))
+                    else:
+                        timestamp = int(items[3].strip())
+                creds.setCredential(items[0].strip(),
+                                    items[1].strip(),
+                                    items[2].strip(),
+                                    timestamp)
+            else:
                 print("Skip line %s" % line)
-                continue
-            creds.setCredential(items[0].strip(),
-                                items[1].strip(),
-                                items[2].strip())
         fh.close()
-        if not creds.records:
-            raise Exception("Imported zero credentials")
-        # Merge with existing credentials only if no site exists in
-        # imported credentials
+        assert creds.records, "Imported zero credentials"
+
+        # Merge with existing credentials for sites not in imported credentials
         existingCreds = Credentials.loadCredentials(outputFile, secrete)
         if existingCreds:
-            for site in existingCreds.records:
+            for site, rec in existingCreds.records.items():
                 if not site in creds.records:
-                    creds.setCredential(site,
-                                        existingCreds.records[site][0],
-                                        existingCreds.records[site][1])
+                    creds.setCredential(site, *rec)
         creds.saveCredentials(outputFile, secrete)
 
     @staticmethod
@@ -205,17 +187,19 @@ class Credentials:
 def initParser():
     parser = argparse.ArgumentParser(description="pwmg command line")
     add_arg = parser.add_argument
-    add_arg("-k", metavar="secrete", type=str, required=True,
+    add_arg("-k", metavar="secrete", type=str, required=False,
             help="Secrete key")
     add_arg("-f", metavar="filename", type=str,
             default=Credentials.defaultCredsFile(),
             help="Credential file")
     add_arg("-n", metavar="new_secrete", type=str,
             help="New secrete key")
+    add_arg("-c", action="store_true",
+            help="New secrete key (interactively)")
     add_arg("-d", action="store_true",
-            help="Delete site")
+            help="Delete credential of a site")
     add_arg("-i", metavar="filename", type=str,
-            help="Import from a plain text file. Merge with existing.")
+            help="Import from a file. Merge with existing.")
     add_arg("-x", metavar="filename", type=str,
             help="Export to a plain text file")
     add_arg("site", metavar="site", type=str, nargs="?")
@@ -226,12 +210,26 @@ def initParser():
 def runCommand(args):
     # pylint: disable-msg=R0912
     if not args.k:
-        raise Exception("Must provide secrete key")
+        s = readSecreteInput("Please input secrete key: ")
+        if not s:
+            raise Exception("Must provide secrete key")
+        args.k = s
     creds = Credentials.loadCredentials(args.f, args.k)
+    if args.c:
+        if not creds or not creds.records:
+            print("No credentials in store")
+            return
+        s = readSecreteInput("New secrete key: ")
+        if not s:
+            raise Exception("Must provide secrete key")
+        creds.saveCredentials(args.f, s)
+        print("Encrypted with new secrete key")
+        return
     if args.n:
         # Use new secrete key
         if creds and creds.records:
             creds.saveCredentials(args.f, args.n)
+            print("Encrypted with new secrete key")
         else:
             print("Credential is empty")
         return
@@ -239,6 +237,7 @@ def runCommand(args):
         # Export credentials to plain text file
         if creds and creds.records:
             creds.exportCredentials(args.x, prettyPrint=False)
+            print("Credentials exported to %s" % args.x)
         else:
             print("Credential is empty")
         return
@@ -267,11 +266,14 @@ def runCommand(args):
         creds.deleteCredential(args.site)
         creds.saveCredentials(args.f, args.k)
     else:
-        creds = creds.getCredentials(args.site)
-        if creds:
-            print(tabulate(creds, headers=["Site", "Account", "Password"]))
+        if not creds:
+            print("No credentials loaded")
         else:
-            print("Site note found")
+            creds = creds.getCredentials(args.site)
+            if creds:
+                printTabulate(creds)
+            else:
+                print("Site not found")
 
     # pylint : enable-msg=R0912
 

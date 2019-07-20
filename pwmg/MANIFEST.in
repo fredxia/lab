@@ -1,0 +1,5 @@
+include LICENSE
+include README
+include README.org
+include pwmg.py
+include test_pwmg.py

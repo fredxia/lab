@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # pylint: disable-msg=C0103,C0111,C0410,W0703
 #
+# Contact: fxia@yahoo.com (Fred Xia)
+#
 # Python3 packages required: pycrypto, tabulate
 #
 # Description:
@@ -41,6 +43,7 @@
 #
 #     For option -i the merge will not overwrite credentials already exists
 #     in the master records.
+#
 #
 import os, sys, argparse, pickle, hashlib
 from struct import pack, unpack, calcsize

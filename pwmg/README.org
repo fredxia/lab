@@ -1,0 +1,72 @@
+#-*- mode: org -*-
+#+STARTUP: showall
+#+STARTUP: indent
+
+* USAGE
+
+pwmg.py [-h] [-k <master key>] [-f <filename>] [-n <new master key>] [-d]
+        [-i <filename>] [-x <filename>]
+        [site] [account] [password]
+
+optional arguments:
+   -h, --help      show this help message and exit
+   -k secrete      Master secrete key
+   -f filename     Credential file to read/write
+   -n new_secrete  Use a new secrete key to encrypt
+   -d              Delete saved password of a site
+   -i filename     Import from a text file. Merge with existing passwords.
+   -x filename     Export passwords to a plain text file
+
+* DESCRIPTION
+
+A simple Python3 program using a master key to encrypt a collection of 
+password records. Each password record consists of a site name, an account,
+and a password.
+
+User provides a master secrete password. This password is used to
+compute a 32-byte hash digest. The digest is then used as the key
+for symmetric encryption/decryption, using ASE256, of Python-pickled
+binary value of the entire collection.
+
+The encrypted collection is saved in a file. If option -f not not specified
+the default file name is the value of environment variable $PWMG_FILENAME,
+if defined. Otherwise saved to file $HOME/.pwmg_db.
+
+* EXAMPLES
+
+Save password to the collection, saved to file mydb.db
+
+./pwmg.py -k mymasterpwd1 "united airline" JZZ123456 TravelForFun -f mydb.db
+
+Search password for site names containing "united" using default file
+
+./pwmg.py -k mymasterpwd2 united
+
+Delete password of "united airline", using interactive mode
+
+./pwmg.py -d "united airline"
+
+* NOTE
+
+If -f is not specified the default is $PWMG_FILENAME, if defined, or
+$HOME/.pwmg_db
+
+Import/Export file format is lines of <site>, <account>, <password>
+Each line is one site.
+
+For option -i the merge will not overwrite credentials already exists
+in the master records.
+
+* SECURITY WARNING
+
+If the command is invoked in a shell such as bash by default the master 
+secrete key, if provided with option "-k", will be saved in shell history, 
+such as ~/.bash_history. This can be a security risk.
+
+To avoid this problem one should either use shell command to disable
+history, such as "set +o history", before using this program, or use the
+interactive mode where master secrete key is entered at prompt.
+
+* REQUIRED PACKAGES
+
+This program requires "pycrypto" and "tabulate" packages.

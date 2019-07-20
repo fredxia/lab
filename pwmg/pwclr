@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+# sample commands to clear bash history
+
+history -c
+echo '' > ~/.bash_history
+

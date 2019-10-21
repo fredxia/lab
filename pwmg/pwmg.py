@@ -54,6 +54,7 @@ class Credentials:
         self.records[site] = (account, password, timestamp)
 
     def deleteCredential(self, site):
+        '''Delete site credential from records'''
         if site in self.records:
             del self.records[site]
 

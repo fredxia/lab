@@ -1,0 +1,5 @@
+#-*- mode: shell-script -*-
+
+# Get user portion of git email
+USER=$(git config user.email | cut -d @ -f 1)
+

@@ -1,0 +1,32 @@
+#-*- mode: shell-script -*-
+
+# Set US English UTF-8 encoding on shell
+export LC_ALL=en_US.UTF-8
+export LANG=en_US.UTF-8
+
+# Set timezone
+mv /etc/localtime /etc/localtime.utc
+ln -s /usr/share/zoneinfo/America/Los_Angeles /etc/localtime
+
+# Check if a port is being listened on. RPM is iproute
+/usr/sbin/ss -ltn
+
+# namespace idenfity
+ip netns identify
+
+# cygwin command line copy to clipboard:
+cat <file> > /dev/clipboard
+
+# extract rpm files
+rpm2cpio <rpm file> | cpio -idmv
+
+# Check if a process is paused
+# Output should be either "T" for paused or "S" for running
+/usr/bin/ps -o s= -p <pid>
+
+# Print cert info
+openssl x509 -in server.cert -text
+
+
+
+
